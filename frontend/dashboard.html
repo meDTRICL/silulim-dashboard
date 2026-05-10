@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Sales</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet"/>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- CSS External -->
+  <link rel="stylesheet" href="style.css"/>
+</head>
+
+<style>
+/* ── AI Panel Toggle Button ── */
+#ai-toggle-btn {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4f8ef7, #7c5cf7);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(79,142,247,0.45);
+  z-index: 1000;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+#ai-toggle-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 28px rgba(79,142,247,0.6);
+}
+#ai-toggle-btn svg {
+  width: 26px;
+  height: 26px;
+  fill: #fff;
+}
+#ai-toggle-btn .ai-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  background: #4ff7a0;
+  border-radius: 50%;
+  border: 2px solid #161920;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #0a1a12;
+}
+ 
+/* ── AI Panel Drawer ── */
+#ai-panel {
+  position: fixed;
+  bottom: 96px;
+  right: 28px;
+  width: 360px;
+  max-height: 540px;
+  background: #1a1f2e;
+  border: 1px solid rgba(79,142,247,0.25);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  z-index: 999;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  transform: scale(0.88) translateY(16px);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s ease;
+  overflow: hidden;
+}
+#ai-panel.open {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  pointer-events: all;
+}
+ 
+/* Panel Header */
+.ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+  background: rgba(79,142,247,0.08);
+  border-bottom: 1px solid rgba(79,142,247,0.15);
+  flex-shrink: 0;
+}
+.ai-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ai-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4f8ef7, #7c5cf7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.ai-panel-title h4 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8ecf7;
+  margin: 0;
+}
+.ai-panel-title span {
+  font-size: 11px;
+  color: #4ff7a0;
+  font-family: 'Space Mono', monospace;
+}
+.ai-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7394;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.ai-close-btn:hover {
+  color: #e8ecf7;
+  background: rgba(255,255,255,0.06);
+}
+ 
+/* Messages Area */
+#ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(79,142,247,0.2) transparent;
+}
+#ai-messages::-webkit-scrollbar { width: 4px; }
+#ai-messages::-webkit-scrollbar-thumb {
+  background: rgba(79,142,247,0.2);
+  border-radius: 4px;
+}
+ 
+/* Message bubbles */
+.ai-msg {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  animation: msgIn 0.2s ease;
+}
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ai-msg.user { flex-direction: row-reverse; }
+ 
+.ai-msg-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+.ai-msg.assistant .ai-msg-avatar {
+  background: linear-gradient(135deg, #4f8ef7, #7c5cf7);
+}
+.ai-msg.user .ai-msg-avatar {
+  background: rgba(79,247,160,0.15);
+  color: #4ff7a0;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+}
+ 
+.ai-msg-bubble {
+  max-width: 78%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.ai-msg.assistant .ai-msg-bubble {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #c8d0e8;
+  border-radius: 4px 12px 12px 12px;
+}
+.ai-msg.user .ai-msg-bubble {
+  background: rgba(79,142,247,0.18);
+  border: 1px solid rgba(79,142,247,0.3);
+  color: #dde6ff;
+  border-radius: 12px 4px 12px 12px;
+}
+ 
+/* Typing indicator */
+.ai-typing {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px 12px 12px 12px;
+  width: fit-content;
+}
+.ai-typing span {
+  width: 6px;
+  height: 6px;
+  background: #6b7394;
+  border-radius: 50%;
+  animation: blink 1.2s infinite;
+}
+.ai-typing span:nth-child(2) { animation-delay: 0.2s; }
+.ai-typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink {
+  0%,80%,100% { opacity: 0.3; transform: scale(1); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+ 
+/* Quick prompts */
+.ai-quick-prompts {
+  padding: 0 16px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.ai-quick-btn {
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  padding: 5px 10px;
+  background: rgba(79,142,247,0.1);
+  border: 1px solid rgba(79,142,247,0.2);
+  border-radius: 20px;
+  color: #7eaaff;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.ai-quick-btn:hover {
+  background: rgba(79,142,247,0.2);
+  border-color: rgba(79,142,247,0.4);
+}
+ 
+/* Input area */
+.ai-input-area {
+  padding: 10px 14px 14px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+#ai-input {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(79,142,247,0.2);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  color: #e8ecf7;
+  resize: none;
+  outline: none;
+  max-height: 90px;
+  line-height: 1.4;
+  transition: border-color 0.15s;
+}
+#ai-input::placeholder { color: #4a5070; }
+#ai-input:focus { border-color: rgba(79,142,247,0.5); }
+ 
+#ai-send-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #4f8ef7, #7c5cf7);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity 0.15s, transform 0.15s;
+}
+#ai-send-btn:hover { opacity: 0.88; transform: scale(1.04); }
+#ai-send-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+#ai-send-btn svg { width: 16px; height: 16px; fill: #fff; }
+ 
+/* Context chip */
+.ai-context-bar {
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.ai-ctx-chip {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  padding: 3px 8px;
+  background: rgba(79,247,160,0.08);
+  border: 1px solid rgba(79,247,160,0.15);
+  border-radius: 20px;
+  color: #4ff7a0;
+}
+.ai-ctx-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: #3d4460;
+}
+</style>
+
+<body>
+
+<div class="wrapper">
+  <header>
+    <div class="logo-area">
+      <div class="logo-icon">📊</div>
+      <div>
+        <h1>Sales <span>Dashboard</span></h1>
+        <div class="subtitle">Superstore Analytics — All Regions</div>
+      </div>
+    </div>
+
+    <div class="server-status" id="serverStatus">
+      <span class="status-dot"></span> Menghubungkan...
+    </div>
+  </header>
+
+  <!-- FILTER -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Tahun</label>
+      <select id="filterYear" onchange="refreshAll()">
+        <option value="">Semua Tahun</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Region</label>
+      <select id="filterRegion" onchange="refreshAll()">
+        <option value="">Semua Region</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Category</label>
+      <select id="filterCategory" onchange="refreshAll()">
+        <option value="">Semua Kategori</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Segment</label>
+      <select id="filterSegment" onchange="refreshAll()">
+        <option value="">Semua Segment</option>
+      </select>
+    </div>
+
+    <button class="btn-refresh" onclick="refreshAll()">↻ Refresh</button>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Revenue</div>
+      <div class="kpi-value" id="kpiRevenue">—</div>
+      <div class="kpi-sub" id="kpiRevenueSub">Loading...</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-label">Total Transaksi</div>
+      <div class="kpi-value" id="kpiTx">—</div>
+      <div class="kpi-sub">jumlah order</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-label">Rata-rata per Order</div>
+      <div class="kpi-value" id="kpiAvg">—</div>
+      <div class="kpi-sub">per transaksi</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-label">Kategori Terlaris</div>
+      <div class="kpi-value" id="kpiBest">—</div>
+      <div class="kpi-sub" id="kpiBestSub"></div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">📦 Revenue per Kategori</div>
+      <canvas id="chartCategory"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">🗺️ Revenue per Region</div>
+      <canvas id="chartRegion"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">👥 Revenue per Segment</div>
+      <canvas id="chartSegment"></canvas>
+    </div>
+
+    <div class="chart-card wide">
+      <div class="chart-title">📈 Tren Penjualan Bulanan</div>
+      <canvas id="chartTrend"></canvas>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-card">
+    <div class="chart-title">🏆 Top 10 Order Tertinggi</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Tanggal</th>
+          <th>Produk</th>
+          <th>Kategori</th>
+          <th>Region</th>
+          <th>Segment</th>
+          <th>Sales (USD)</th>
+        </tr>
+      </thead>
+
+      <tbody id="tableBody">
+        <tr>
+          <td colspan="7">
+            <div class="loading">
+              <div class="spinner"></div> Memuat data...
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<button id="ai-toggle-btn" title="AI Analyst" aria-label="Buka AI Chat Analyst">
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+    <path d="M9 8h2v8H9zm4 0h2v8h-2z" fill="rgba(255,255,255,0.3)"/>
+  </svg>
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="position:absolute">
+    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM9 11H7V9h2v2zm4 0h-2V9h2v2zm4 0h-2V9h2v2z"/>
+  </svg>
+  <div class="ai-badge">AI</div>
+</button>
+ 
+<!-- AI Chat Panel -->
+<div id="ai-panel" role="dialog" aria-label="AI Chat Analyst">
+  <div class="ai-panel-header">
+    <div class="ai-panel-title">
+      <div class="ai-avatar">🤖</div>
+      <div>
+        <h4>AI Analyst</h4>
+        <span>● Online · pakai data dashboard</span>
+      </div>
+    </div>
+    <button class="ai-close-btn" id="ai-close-btn" aria-label="Tutup panel">✕</button>
+  </div>
+ 
+  <div id="ai-messages">
+    <!-- Pesan pembuka -->
+    <div class="ai-msg assistant">
+      <div class="ai-msg-avatar">🤖</div>
+      <div class="ai-msg-bubble">
+        Halo! Saya <strong>AI Analyst</strong> yang terhubung langsung ke data dashboard ini.<br><br>
+        Tanya apa saja tentang penjualan — saya akan jawab berdasarkan data yang sedang kamu lihat. 👇
+      </div>
+    </div>
+  </div>
+ 
+  <!-- Quick prompts -->
+  <div class="ai-quick-prompts" id="ai-quick-prompts">
+    <button class="ai-quick-btn" onclick="aiSendQuick('Kategori mana yang paling tinggi revenue-nya?')">📦 Kategori terlaris</button>
+    <button class="ai-quick-btn" onclick="aiSendQuick('Region mana yang performa-nya paling bagus?')">🗺️ Region terbaik</button>
+    <button class="ai-quick-btn" onclick="aiSendQuick('Bagaimana tren penjualan beberapa bulan terakhir?')">📈 Tren penjualan</button>
+    <button class="ai-quick-btn" onclick="aiSendQuick('Berikan insight penting dari data yang sedang ditampilkan.')">💡 Insight data</button>
+  </div>
+ 
+  <!-- Context bar -->
+  <div class="ai-context-bar">
+    <span class="ai-ctx-label">Konteks aktif:</span>
+    <span class="ai-ctx-chip" id="ai-ctx-filter">Semua data</span>
+  </div>
+ 
+  <!-- Input -->
+  <div class="ai-input-area">
+    <textarea
+      id="ai-input"
+      rows="1"
+      placeholder="Tanya tentang data penjualan…"
+      aria-label="Pesan ke AI Analyst"
+    ></textarea>
+    <button id="ai-send-btn" aria-label="Kirim pesan">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+(function () {
+  // ── State ────────────────────────────────────────────────
+  const chatHistory = [];   // { role, content }[]
+  let isLoading = false;
+ 
+  // ── DOM refs ─────────────────────────────────────────────
+  const panel     = document.getElementById("ai-panel");
+  const toggleBtn = document.getElementById("ai-toggle-btn");
+  const closeBtn  = document.getElementById("ai-close-btn");
+  const messages  = document.getElementById("ai-messages");
+  const input     = document.getElementById("ai-input");
+  const sendBtn   = document.getElementById("ai-send-btn");
+  const ctxChip   = document.getElementById("ai-ctx-filter");
+  const quickWrap = document.getElementById("ai-quick-prompts");
+ 
+  // ── Toggle panel ─────────────────────────────────────────
+  toggleBtn.addEventListener("click", () => panel.classList.toggle("open"));
+  closeBtn.addEventListener("click",  () => panel.classList.remove("open"));
+ 
+  // ── Auto-resize textarea ─────────────────────────────────
+  input.addEventListener("input", () => {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 90) + "px";
+  });
+ 
+  // ── Send on Enter (Shift+Enter = newline) ─────────────────
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  sendBtn.addEventListener("click", sendMessage);
+ 
+  // ── Quick prompt ─────────────────────────────────────────
+  window.aiSendQuick = function (text) {
+    input.value = text;
+    sendMessage();
+  };
+ 
+  // ── Update context chip dari filter aktif ─────────────────
+  // Dipanggil oleh app.js setiap refreshAll() — lihat patch di bawah
+  window.aiUpdateContext = function (filters) {
+    const parts = [
+      filters.year     && filters.year,
+      filters.region   && filters.region,
+      filters.category && filters.category,
+      filters.segment  && filters.segment,
+    ].filter(Boolean);
+    ctxChip.textContent = parts.length ? parts.join(" · ") : "Semua data";
+  };
+ 
+  // ── Kumpulkan data dashboard saat ini ────────────────────
+  function collectDashboardContext() {
+    const f = typeof getFilters === "function" ? getFilters() : {};
+ 
+    // KPI dari DOM
+    const toNum = (id) => {
+      const txt = (document.getElementById(id)?.textContent || "0")
+        .replace(/[$,KMkm\s]/g, "");
+      const mult = document.getElementById(id)?.textContent?.includes("M") ? 1_000_000
+                 : document.getElementById(id)?.textContent?.includes("K") ? 1_000 : 1;
+      return (parseFloat(txt) || 0) * mult;
+    };
+ 
+    const kpi = {
+      totalRevenue  : toNum("kpiRevenue"),
+      totalTransaksi: parseInt((document.getElementById("kpiTx")?.textContent || "0").replace(/,/g,"")) || 0,
+      rataRata      : toNum("kpiAvg"),
+      kategoriBest  : document.getElementById("kpiBest")?.textContent?.trim() || "—",
+    };
+ 
+    // Chart data dari Chart.js instances (exposed by app.js)
+    const chartData = (chart, labelKey, valueKey) => {
+      if (!chart?.data) return [];
+      return chart.data.labels.map((label, i) => ({
+        [labelKey]: label,
+        [valueKey]: chart.data.datasets[0]?.data?.[i] || 0,
+      }));
+    };
+ 
+    return {
+      filters: f,
+      kpi,
+      summary : typeof chartCategory !== "undefined" ? chartData(chartCategory, "product", "total") : [],
+      region  : typeof chartRegion   !== "undefined" ? chartData(chartRegion,   "region",  "total") : [],
+      segment : typeof chartSegment  !== "undefined" ? chartData(chartSegment,  "segment", "total") : [],
+      trend   : typeof chartTrend    !== "undefined" ? chartData(chartTrend,    "month",   "total") : [],
+    };
+  }
+ 
+  // ── Add message bubble ───────────────────────────────────
+  function addMessage(role, content) {
+    const wrap = document.createElement("div");
+    wrap.className = `ai-msg ${role}`;
+ 
+    const avatar = document.createElement("div");
+    avatar.className = "ai-msg-avatar";
+    avatar.textContent = role === "assistant" ? "🤖" : "U";
+ 
+    const bubble = document.createElement("div");
+    bubble.className = "ai-msg-bubble";
+    bubble.innerHTML = content.replace(/\n/g, "<br>");
+ 
+    wrap.append(avatar, bubble);
+    messages.appendChild(wrap);
+    messages.scrollTop = messages.scrollHeight;
+    return wrap;
+  }
+ 
+  // ── Typing indicator ─────────────────────────────────────
+  function showTyping() {
+    const wrap = document.createElement("div");
+    wrap.className = "ai-msg assistant";
+    wrap.id = "ai-typing-indicator";
+ 
+    const avatar = document.createElement("div");
+    avatar.className = "ai-msg-avatar";
+    avatar.textContent = "🤖";
+ 
+    const typing = document.createElement("div");
+    typing.className = "ai-typing";
+    typing.innerHTML = "<span></span><span></span><span></span>";
+ 
+    wrap.append(avatar, typing);
+    messages.appendChild(wrap);
+    messages.scrollTop = messages.scrollHeight;
+  }
+ 
+  function hideTyping() {
+    document.getElementById("ai-typing-indicator")?.remove();
+  }
+ 
+  // ── Main send function ────────────────────────────────────
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text || isLoading) return;
+ 
+    // Sembunyikan quick prompts setelah pesan pertama
+    quickWrap.style.display = "none";
+ 
+    isLoading = true;
+    sendBtn.disabled = true;
+    input.value = "";
+    input.style.height = "auto";
+ 
+    addMessage("user", text);
+    chatHistory.push({ role: "user", content: text });
+ 
+    showTyping();
+ 
+    try {
+      const context = collectDashboardContext();
+ 
+      const res = await fetch(API + "/ai-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          context,
+          history: chatHistory.slice(-8),  // kirim 8 pesan terakhir sebagai konteks
+        }),
+      });
+ 
+      hideTyping();
+ 
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+ 
+      const { answer } = await res.json();
+      addMessage("assistant", answer);
+      chatHistory.push({ role: "assistant", content: answer });
+ 
+    } catch (err) {
+      hideTyping();
+      addMessage("assistant", `⚠️ Gagal menghubungi AI: ${err.message}`);
+    } finally {
+      isLoading = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+ 
+})();
+</script>
+
+</body>
+</html>
