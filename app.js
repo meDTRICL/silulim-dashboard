@@ -1,4 +1,5 @@
 const API = "https://repo-production-de6e.up.railway.app";
+            //  https://repo-production-de6e.up.railway.app
 
 let chartCategory, chartRegion, chartTrend, chartSegment;
 
@@ -365,5 +366,81 @@ setInterval(() => refreshAll(), 30000);
 checkServer();
 loadOptions().then(() => refreshAll());
 
-
 // ========================= [ Fitur AI ] ========================
+
+let aiHistory = [];
+let aiContext = {};
+
+function aiUpdateContext(filters) {
+  const kpi = {
+    totalRevenue:   parseFloat(document.getElementById("kpiRevenue")?.textContent?.replace(/[^0-9.]/g,"")) || 0,
+    totalTransaksi: parseFloat(document.getElementById("kpiTx")?.textContent?.replace(/[^0-9.]/g,"")) || 0,
+    rataRata:       parseFloat(document.getElementById("kpiAvg")?.textContent?.replace(/[^0-9.]/g,"")) || 0,
+    kategoriBest:   document.getElementById("kpiBest")?.textContent || ""
+  };
+  aiContext = { filters, kpi };
+}
+
+async function aiSend() {
+  const input = document.getElementById("aiInput");
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  aiAppendMessage("user", msg);
+  input.value = "";
+  aiAppendMessage("assistant", "⏳ Sedang menganalisis...", true);
+
+  try {
+    const res = await fetch(`${API}/ai-chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: msg,
+        context: aiContext,
+        history: aiHistory
+      })
+    });
+
+    const data = await res.json();
+    aiRemoveTyping();
+
+    if (data.answer) {
+      aiAppendMessage("assistant", data.answer);
+      aiHistory.push({ role: "user",      content: msg });
+      aiHistory.push({ role: "assistant", content: data.answer });
+      if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
+    } else {
+      aiAppendMessage("assistant", "⚠️ " + (data.error || "Gagal mendapat jawaban."));
+    }
+  } catch (e) {
+    aiRemoveTyping();
+    aiAppendMessage("assistant", "⚠️ Gagal menghubungi server: " + e.message);
+  }
+}
+
+function aiAppendMessage(role, text, isTyping = false) {
+  const box = document.getElementById("aiMessages");
+  if (!box) return;
+  const div = document.createElement("div");
+  div.className = "ai-msg ai-" + role + (isTyping ? " ai-typing" : "");
+  div.textContent = text;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function aiRemoveTyping() {
+  document.querySelector(".ai-typing")?.remove();
+}
+
+function aiClear() {
+  aiHistory = [];
+  const box = document.getElementById("aiMessages");
+  if (box) box.innerHTML = "";
+}
+
+// Enter untuk kirim
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("aiInput")?.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); aiSend(); }
+  });
+});
