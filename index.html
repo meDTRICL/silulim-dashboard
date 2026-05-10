@@ -521,10 +521,17 @@
     </button>
   </div> -->
 
-  <div id="aiMessages"></div>
-  <input id="aiInput" placeholder="Tanya tentang data..." />
-  <button onclick="aiSend()">Kirim</button>
-  <button onclick="aiClear()">Reset</button>
+  <div class="ai-input-area">
+    <textarea
+      id="ai-input"
+      rows="1"
+      placeholder="Tanya tentang data penjualan…"
+      aria-label="Pesan ke AI Analyst"
+    ></textarea>
+    <button id="ai-send-btn" aria-label="Kirim pesan">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
 </div>
 
 <script src="app.js"></script>
