@@ -364,3 +364,144 @@ setInterval(() => refreshAll(), 30000);
 
 checkServer();
 loadOptions().then(() => refreshAll());
+
+
+// ========================= [ Fitur AI ] ========================
+// Inisialisasi SDK Anthropic
+let anthropic = null;
+try {
+  const Anthropic = require("@anthropic-ai/sdk");
+  anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  console.log("✅ Anthropic SDK berhasil diload");
+} catch (err) {
+  console.warn("⚠️  @anthropic-ai/sdk tidak ditemukan, akan pakai fetch native:", err.message);
+}
+
+// Helper format angka
+function fmtUSD(n) {
+  n = parseFloat(n) || 0;
+  if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M";
+  if (n >= 1_000)     return "$" + (n / 1_000).toFixed(1) + "K";
+  return "$" + n.toFixed(2);
+}
+
+// Susun system prompt dari data dashboard
+function buildSystemPrompt(ctx) {
+  const { filters = {}, kpi = {}, summary = [], region = [], segment = [], trend = [] } = ctx;
+
+  const filterDesc = [
+    filters.year     && `Tahun: ${filters.year}`,
+    filters.region   && `Region: ${filters.region}`,
+    filters.category && `Kategori: ${filters.category}`,
+    filters.segment  && `Segment: ${filters.segment}`,
+  ].filter(Boolean).join(", ") || "Semua data (tanpa filter)";
+
+  const lines = (arr, k1, k2) =>
+    arr.map(d => `  - ${d[k1]}: ${fmtUSD(d[k2])}`).join("\n") || "  (tidak ada data)";
+
+  return `Kamu adalah AI Sales Analyst untuk Sales Dashboard Superstore.
+Jawab pertanyaan konsumen tentang data penjualan yang sedang ditampilkan.
+
+== DATA DASHBOARD AKTIF ==
+Filter: ${filterDesc}
+
+KPI:
+  - Total Revenue     : ${fmtUSD(kpi.totalRevenue || 0)}
+  - Total Transaksi   : ${(kpi.totalTransaksi || 0).toLocaleString()} order
+  - Rata-rata/Order   : ${fmtUSD(kpi.rataRata || 0)}
+  - Kategori terlaris : ${kpi.kategoriBest || "—"}
+
+Revenue per Kategori:
+${lines(summary, "product", "total")}
+
+Revenue per Region:
+${lines(region, "region", "total")}
+
+Revenue per Segment:
+${lines(segment, "segment", "total")}
+
+Tren 6 Bulan Terakhir:
+${trend.slice(-6).map(d => `  - ${d.month}: ${fmtUSD(d.total)}`).join("\n") || "  (tidak ada data)"}
+
+== ATURAN ==
+- Bahasa Indonesia, singkat dan langsung.
+- Gunakan angka dari data di atas, jangan mengarang.
+- Maksimal 4-5 kalimat kecuali diminta lebih.
+- Kamu adalah "AI Analyst TVI Dashboard", bukan Claude.`;
+}
+
+app.post("/ai-chat", async (req, res) => {
+  try {
+    const { message, context, history = [] } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: "Field 'message' wajib diisi." });
+    }
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({
+        error: "ANTHROPIC_API_KEY belum di-set. Tambahkan di Railway Variables."
+      });
+    }
+
+    const systemPrompt = buildSystemPrompt(context || {});
+    const messages = [
+      ...history.map(h => ({ role: h.role, content: h.content })),
+      { role: "user", content: message.trim() }
+    ];
+
+    let answer;
+
+    if (anthropic) {
+      // ── Via SDK ──────────────────────────────────────────
+      const msg = await anthropic.messages.create({
+        model:      "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        system:     systemPrompt,
+        messages,
+      });
+      answer = msg.content[0].text;
+
+    } else {
+      // ── Via native fetch (fallback Node ≥18) ─────────────
+      const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type":      "application/json",
+          "x-api-key":         apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model:      "claude-sonnet-4-20250514",
+          max_tokens: 1024,
+          system:     systemPrompt,
+          messages,
+        }),
+      });
+
+      if (!apiRes.ok) {
+        const err = await apiRes.json().catch(() => ({}));
+        throw new Error(err.error?.message || `Anthropic API HTTP ${apiRes.status}`);
+      }
+      const data = await apiRes.json();
+      answer = data.content[0].text;
+    }
+
+    res.json({ answer });
+
+  } catch (err) {
+    console.error("[AI Chat] Error:", err.message);
+    res.status(500).json({ error: err.message || "Terjadi kesalahan di server." });
+  }
+});
+
+
+/* ─── Start server ──────────────────────────────────────── */
+app.listen(PORT, () => {
+  console.log(`✅ Server jalan di port : ${PORT}`);
+  console.log(`📡 AI Chat endpoint  : POST /ai-chat`);
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn("⚠️  ANTHROPIC_API_KEY belum di-set — fitur AI tidak akan berfungsi");
+  }
+});
